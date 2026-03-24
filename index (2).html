@@ -1,0 +1,1968 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MATH ARCADE — Il Gioco della Matematica</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap');
+
+  :root {
+    --neon-cyan: #00f5ff;
+    --neon-pink: #ff006e;
+    --neon-yellow: #ffd60a;
+    --neon-green: #39ff14;
+    --neon-purple: #bf5af2;
+    --bg: #050a14;
+    --bg2: #0a1628;
+    --card: #0d1f3c;
+    --glass: rgba(0,245,255,0.05);
+    --border: rgba(0,245,255,0.2);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'Exo 2', sans-serif;
+    background: var(--bg);
+    color: #e0f4ff;
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  /* === STARS BACKGROUND === */
+  #stars-canvas {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    z-index: 0; pointer-events: none;
+  }
+
+  /* === PARTICLES === */
+  .particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    font-size: 1.5rem;
+    animation: flyUp 1s ease-out forwards;
+  }
+  @keyframes flyUp {
+    0% { opacity:1; transform: translateY(0) scale(1); }
+    100% { opacity:0; transform: translateY(-120px) scale(1.5); }
+  }
+
+  /* === SCREEN SYSTEM === */
+  .screen { display:none; position:relative; z-index:1; min-height:100vh; }
+  .screen.active { display:flex; flex-direction:column; align-items:center; }
+
+  /* === MAIN MENU === */
+  #menu-screen {
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-pink), var(--neon-yellow));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: logoPulse 3s ease-in-out infinite;
+    text-shadow: none;
+    margin-bottom: 0.2em;
+  }
+
+  @keyframes logoPulse {
+    0%,100% { filter: drop-shadow(0 0 20px #00f5ff88); }
+    50% { filter: drop-shadow(0 0 40px #ff006e88); }
+  }
+
+  .subtitle {
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    color: var(--neon-cyan);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 3rem;
+    opacity: 0.7;
+  }
+
+  .score-display {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 2.5rem;
+    margin-bottom: 2.5rem;
+    font-family: 'Orbitron', monospace;
+    font-size: 1.1rem;
+    color: var(--neon-yellow);
+  }
+
+  .score-display span { color: white; font-size: 1.5rem; }
+
+  .game-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    max-width: 900px;
+    width: 100%;
+  }
+
+  .game-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2rem 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+  }
+
+  .game-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 60%, rgba(0,245,255,0.05));
+    transition: opacity 0.3s;
+  }
+
+  .game-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 30px rgba(0,245,255,0.3), 0 0 60px rgba(0,245,255,0.1);
+  }
+
+  .card-icon { font-size: 3.5rem; margin-bottom: 1rem; display: block; }
+  .card-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--neon-cyan);
+  }
+  .card-desc { font-size: 0.85rem; color: #8ab4d4; line-height: 1.5; }
+  .card-badge {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.3rem 1rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-family: 'Orbitron', monospace;
+    font-weight: 700;
+  }
+
+  .badge-cyan { background: rgba(0,245,255,0.15); color: var(--neon-cyan); border: 1px solid var(--neon-cyan); }
+  .badge-pink { background: rgba(255,0,110,0.15); color: var(--neon-pink); border: 1px solid var(--neon-pink); }
+  .badge-yellow { background: rgba(255,214,10,0.15); color: var(--neon-yellow); border: 1px solid var(--neon-yellow); }
+  .badge-green { background: rgba(57,255,20,0.15); color: var(--neon-green); border: 1px solid var(--neon-green); }
+
+  /* === GAME SCREEN SHARED === */
+  .game-header {
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 1rem 1rem;
+  }
+
+  .game-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.3rem;
+    color: var(--neon-cyan);
+  }
+
+  .hud {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+  }
+
+  .hud-item {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.9rem;
+    color: #8ab4d4;
+  }
+
+  .hud-item span {
+    color: var(--neon-yellow);
+    font-size: 1.2rem;
+  }
+
+  .btn-back {
+    background: rgba(255,0,110,0.1);
+    border: 1px solid var(--neon-pink);
+    color: var(--neon-pink);
+    padding: 0.5rem 1.2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+  }
+  .btn-back:hover { background: rgba(255,0,110,0.25); }
+
+  /* === QUESTION AREA === */
+  .question-box {
+    background: var(--card);
+    border: 2px solid var(--neon-cyan);
+    border-radius: 20px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 720px;
+    margin: 0 1rem 1.5rem;
+    box-shadow: 0 0 30px rgba(0,245,255,0.15);
+    text-align: center;
+    position: relative;
+  }
+
+  .question-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    color: var(--neon-cyan);
+    letter-spacing: 0.2em;
+    margin-bottom: 0.8rem;
+    opacity: 0.7;
+  }
+
+  .question-text {
+    font-size: clamp(1.2rem, 3.5vw, 1.7rem);
+    font-weight: 600;
+    color: white;
+    line-height: 1.5;
+  }
+
+  .question-text .highlight {
+    color: var(--neon-yellow);
+    font-family: 'Orbitron', monospace;
+    font-size: 1.2em;
+  }
+
+  /* === ANSWERS GRID === */
+  .answers-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    max-width: 720px;
+    width: 100%;
+    padding: 0 1rem;
+  }
+
+  .answer-btn {
+    background: var(--card);
+    border: 2px solid rgba(0,245,255,0.3);
+    border-radius: 14px;
+    padding: 1.2rem;
+    cursor: pointer;
+    font-family: 'Exo 2', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #d0eaff;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .answer-btn:hover {
+    border-color: var(--neon-cyan);
+    background: rgba(0,245,255,0.08);
+    transform: scale(1.03);
+    box-shadow: 0 0 20px rgba(0,245,255,0.2);
+  }
+
+  .answer-btn.correct {
+    border-color: var(--neon-green) !important;
+    background: rgba(57,255,20,0.15) !important;
+    color: var(--neon-green) !important;
+    animation: correctPulse 0.5s ease;
+  }
+
+  .answer-btn.wrong {
+    border-color: var(--neon-pink) !important;
+    background: rgba(255,0,110,0.15) !important;
+    color: var(--neon-pink) !important;
+    animation: shake 0.5s ease;
+  }
+
+  @keyframes correctPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.06); box-shadow: 0 0 40px rgba(57,255,20,0.5); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+
+  /* === FEEDBACK OVERLAY === */
+  .feedback {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(2rem, 8vw, 4rem);
+    font-weight: 900;
+    z-index: 100;
+    pointer-events: none;
+    transition: transform 0.15s ease;
+    text-shadow: 0 0 40px currentColor;
+  }
+
+  .feedback.show { transform: translate(-50%, -50%) scale(1); animation: feedbackAnim 0.8s ease forwards; }
+  @keyframes feedbackAnim {
+    0% { transform: translate(-50%, -50%) scale(0); opacity:1; }
+    50% { transform: translate(-50%, -60%) scale(1.1); opacity:1; }
+    100% { transform: translate(-50%, -80%) scale(0.8); opacity:0; }
+  }
+
+  .feedback.correct { color: var(--neon-green); }
+  .feedback.wrong { color: var(--neon-pink); }
+
+  /* === PROGRESS BAR === */
+  .progress-bar-container {
+    width: 100%;
+    max-width: 720px;
+    padding: 0 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+    border-radius: 10px;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 10px var(--neon-cyan);
+  }
+
+  /* === CANVAS GAME (Catch) === */
+  #catch-canvas {
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    background: var(--card);
+    max-width: 100%;
+    cursor: none;
+  }
+
+  /* === GEOMETRY SCREEN === */
+  .geo-container {
+    max-width: 740px;
+    width: 100%;
+    padding: 0 1rem;
+  }
+
+  .segment-visual {
+    background: var(--card);
+    border: 2px solid var(--neon-purple);
+    border-radius: 16px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 0 20px rgba(191,90,242,0.2);
+  }
+
+  #geo-canvas {
+    width: 100%;
+    height: 170px;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.3);
+    display: block;
+  }
+
+  .geo-problem {
+    font-size: 1.05rem;
+    color: white;
+    line-height: 1.9;
+    margin: 0.5rem 0 1rem;
+  }
+
+  .geo-problem .num {
+    font-family: 'Orbitron', monospace;
+    color: var(--neon-yellow);
+    font-size: 1.1em;
+  }
+
+  .geo-inputs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: center;
+    margin: 1rem 0;
+  }
+
+  .seg-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--card);
+    border: 2px solid rgba(191,90,242,0.4);
+    border-radius: 14px;
+    padding: 0.7rem 1.2rem;
+    transition: border-color 0.2s;
+  }
+  .seg-input-row:focus-within { border-color: var(--neon-purple); box-shadow: 0 0 12px rgba(191,90,242,0.3); }
+  .seg-input-row.correct-row { border-color: var(--neon-green) !important; }
+  .seg-input-row.wrong-row   { border-color: var(--neon-pink)  !important; }
+
+  .seg-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    min-width: 28px;
+    text-align: center;
+  }
+  .seg-label.lbl-a { color: var(--neon-cyan); }
+  .seg-label.lbl-b { color: var(--neon-pink); }
+
+  .seg-eq { color: #8ab4d4; font-size: 1rem; }
+
+  .math-input {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: white;
+    font-family: 'Orbitron', monospace;
+    font-size: 1.1rem;
+    padding: 0.4rem 0.7rem;
+    width: 90px;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .math-input:focus { border-color: var(--neon-cyan); }
+  .math-input:disabled { opacity: 0.6; }
+
+  .unit-label { font-size: 0.85rem; color: #8ab4d4; }
+
+  /* === BUTTONS === */
+  .btn-primary {
+    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
+    border: none;
+    border-radius: 12px;
+    color: #000;
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    padding: 0.9rem 2.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+  .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0,245,255,0.4); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-next {
+    background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink));
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.95rem;
+    font-weight: 700;
+    padding: 0.8rem 2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 1rem;
+    display: none;
+  }
+  .btn-next.visible { display: inline-block; }
+  .btn-next:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(191,90,242,0.4); }
+
+  /* === RESULTS SCREEN === */
+  #results-screen {
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .result-title {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.8rem, 5vw, 3rem);
+    font-weight: 900;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, var(--neon-yellow), var(--neon-green));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: logoPulse 2s infinite;
+  }
+
+  .result-score-big {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(3rem, 12vw, 7rem);
+    font-weight: 900;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 60px var(--neon-cyan);
+    animation: scoreBounce 1s ease;
+    display: block;
+    margin: 1rem 0;
+  }
+
+  @keyframes scoreBounce {
+    0% { transform: scale(0); opacity:0; }
+    60% { transform: scale(1.2); }
+    100% { transform: scale(1); opacity:1; }
+  }
+
+  .star-rating { font-size: 3rem; margin: 1rem 0; letter-spacing: 0.2em; }
+  .result-msg { font-size: 1.1rem; color: #8ab4d4; max-width: 400px; margin: 0 auto 2rem; }
+
+  .scoreboard {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    margin: 1rem auto 2rem;
+    max-width: 400px;
+    text-align: left;
+  }
+
+  .scoreboard-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.8rem;
+    color: var(--neon-cyan);
+    letter-spacing: 0.2em;
+    margin-bottom: 1rem;
+  }
+
+  .score-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 0.9rem;
+  }
+
+  .score-line:last-child { border-bottom: none; }
+  .score-line .val { font-family: 'Orbitron', monospace; color: var(--neon-yellow); }
+
+  /* === HINT BOX === */
+  .hint-box {
+    background: rgba(255,214,10,0.08);
+    border: 1px solid var(--neon-yellow);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+    color: #ffe066;
+    line-height: 1.6;
+    max-width: 720px;
+    width: 100%;
+  }
+
+  .hint-box strong { color: var(--neon-yellow); font-family: 'Orbitron', monospace; font-size: 0.8rem; }
+
+  /* === MULTIPLIER RUSH SPECIFIC === */
+  .catch-hud {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1rem;
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+  }
+
+  .catch-hud .item { color: #8ab4d4; }
+  .catch-hud .item span { color: var(--neon-yellow); font-size: 1.3rem; }
+
+  /* === TIMER CIRCLE === */
+  .timer-circle {
+    width: 60px;
+    height: 60px;
+    position: relative;
+  }
+
+  .timer-circle svg { transform: rotate(-90deg); }
+  .timer-circle .track { fill: none; stroke: rgba(255,255,255,0.1); stroke-width: 4; }
+  .timer-circle .fill {
+    fill: none;
+    stroke: var(--neon-cyan);
+    stroke-width: 4;
+    stroke-dasharray: 163;
+    stroke-dashoffset: 0;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.1s linear, stroke 0.3s;
+  }
+
+  .timer-number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    color: white;
+    font-weight: 700;
+  }
+
+  /* === COMBO === */
+  .combo-display {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    color: var(--neon-yellow);
+    z-index: 50;
+    text-align: right;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .combo-display.show { opacity: 1; }
+  .combo-num { font-size: 2.5rem; font-weight: 900; text-shadow: 0 0 20px var(--neon-yellow); }
+
+  /* === GRID SELECTION === */
+  .num-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.5rem;
+    max-width: 400px;
+    margin: 1rem auto;
+  }
+
+  .num-cell {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 0.8rem;
+    text-align: center;
+    cursor: pointer;
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+
+  .num-cell:hover { border-color: var(--neon-cyan); background: rgba(0,245,255,0.08); }
+  .num-cell.selected-good { border-color: var(--neon-green); background: rgba(57,255,20,0.15); color: var(--neon-green); }
+  .num-cell.selected-bad { border-color: var(--neon-pink); background: rgba(255,0,110,0.15); color: var(--neon-pink); }
+  .num-cell.disabled { opacity: 0.4; pointer-events: none; }
+
+  /* responsive */
+  @media (max-width: 500px) {
+    .answers-grid { grid-template-columns: 1fr; }
+    .num-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stars-canvas"></canvas>
+
+<!-- FEEDBACK OVERLAY -->
+<div class="feedback" id="feedback"></div>
+<div class="combo-display" id="combo-display">
+  <div>COMBO</div>
+  <div class="combo-num" id="combo-num">x2</div>
+</div>
+
+<!-- ================== MENU ================== -->
+<div class="screen active" id="menu-screen">
+  <div class="logo">MATH ARCADE</div>
+  <div class="subtitle">⚡ Il Gioco della Matematica ⚡</div>
+  
+  <div class="score-display">
+    🏆 Punteggio Totale: <span id="total-score-display">0</span> pt
+  </div>
+
+  <div class="game-cards">
+    <div class="game-card" onclick="startGame('divisori')">
+      <span class="card-icon">🔢</span>
+      <div class="card-title">DIVISORI & MULTIPLI</div>
+      <div class="card-desc">Quiz veloce su divisori, multipli, MCD e mcm. Rispondi prima che il tempo scada!</div>
+      <span class="card-badge badge-cyan">10 DOMANDE</span>
+    </div>
+    <div class="game-card" onclick="startGame('catch')">
+      <span class="card-icon">🎮</span>
+      <div class="card-title">MULTIPLI RUSH</div>
+      <div class="card-desc">Cattura tutti i multipli del numero richiesto! Schiva quelli sbagliati!</div>
+      <span class="card-badge badge-pink">ARCADE</span>
+    </div>
+    <div class="game-card" onclick="startGame('geometria')">
+      <span class="card-icon">📐</span>
+      <div class="card-title">GEOMETRIA DEI SEGMENTI</div>
+      <div class="card-desc">Problemi su punti, segmenti, semirette e calcolo delle lunghezze.</div>
+      <span class="card-badge badge-yellow">8 PROBLEMI</span>
+    </div>
+    <div class="game-card" onclick="startGame('caccia')">
+      <span class="card-icon">🎯</span>
+      <div class="card-title">CACCIA AL DIVISORE</div>
+      <div class="card-desc">Seleziona tutti i divisori di un numero dalla griglia. Più veloce sei, più punti guadagni!</div>
+      <span class="card-badge badge-green">SFIDA</span>
+    </div>
+  </div>
+</div>
+
+<!-- ================== DIVISORI GAME ================== -->
+<div class="screen" id="divisori-screen">
+  <div class="game-header">
+    <div class="game-title">🔢 DIVISORI & MULTIPLI</div>
+    <div class="hud">
+      <div class="hud-item">Punti <span id="div-score">0</span></div>
+      <div class="timer-circle">
+        <svg viewBox="0 0 56 56" width="56" height="56">
+          <circle class="track" cx="28" cy="28" r="26"/>
+          <circle class="fill" id="timer-fill" cx="28" cy="28" r="26"/>
+        </svg>
+        <div class="timer-number" id="timer-num">15</div>
+      </div>
+      <button class="btn-back" onclick="goMenu()">✕ MENU</button>
+    </div>
+  </div>
+
+  <div class="progress-bar-container">
+    <div class="progress-bar"><div class="progress-fill" id="div-progress" style="width:0%"></div></div>
+  </div>
+
+  <div class="question-box">
+    <div class="question-label">DOMANDA <span id="div-qnum">1</span> / 10</div>
+    <div class="question-text" id="div-question">Caricamento...</div>
+  </div>
+
+  <div class="answers-grid" id="div-answers"></div>
+  <div id="div-hint" class="hint-box" style="display:none;margin:1rem;"></div>
+</div>
+
+<!-- ================== CATCH GAME ================== -->
+<div class="screen" id="catch-screen">
+  <div class="game-header">
+    <div class="game-title">🎮 MULTIPLI RUSH</div>
+    <div class="hud">
+      <div class="hud-item">Punti <span id="catch-score">0</span></div>
+      <div class="hud-item">Vite <span id="catch-lives">❤️❤️❤️</span></div>
+      <button class="btn-back" onclick="stopCatch(); goMenu()">✕ MENU</button>
+    </div>
+  </div>
+  <div class="catch-hud">
+    <div class="item">Multipli di: <span id="catch-target">3</span></div>
+    <div class="item">Livello: <span id="catch-level">1</span></div>
+  </div>
+  <canvas id="catch-canvas" width="700" height="420"></canvas>
+  <div style="color:#8ab4d4;font-size:0.85rem;margin-top:0.8rem;">
+    🖱️ Muovi il mouse per spostare il cestino
+  </div>
+</div>
+
+<!-- ================== GEOMETRIA GAME ================== -->
+<div class="screen" id="geometria-screen">
+  <div class="game-header">
+    <div class="game-title">📐 GEOMETRIA DEI SEGMENTI</div>
+    <div class="hud">
+      <div class="hud-item">Punti <span id="geo-score">0</span></div>
+      <div class="hud-item">Problema <span id="geo-qnum">1</span>/10</div>
+      <button class="btn-back" onclick="goMenu()">✕ MENU</button>
+    </div>
+  </div>
+  <div class="geo-container">
+
+    <!-- Enunciato -->
+    <div class="question-box" style="border-color:var(--neon-purple);box-shadow:0 0 30px rgba(191,90,242,0.2);margin-bottom:1rem;">
+      <div class="question-label">📐 PROBLEMA</div>
+      <div class="geo-problem" id="geo-problem">...</div>
+    </div>
+
+    <!-- Canvas dei due segmenti -->
+    <div class="segment-visual">
+      <canvas id="geo-canvas" width="660" height="170"></canvas>
+    </div>
+
+    <!-- Input dei due segmenti -->
+    <div class="geo-inputs" id="geo-inputs">
+      <div class="seg-input-row" id="row-a">
+        <span class="seg-label lbl-a" id="geo-label-a">AB</span>
+        <span class="seg-eq">=</span>
+        <input class="math-input" id="geo-ans-a" type="number" step="0.5" min="0" placeholder="?"/>
+        <span class="unit-label">cm</span>
+      </div>
+      <div class="seg-input-row" id="row-b">
+        <span class="seg-label lbl-b" id="geo-label-b">CD</span>
+        <span class="seg-eq">=</span>
+        <input class="math-input" id="geo-ans-b" type="number" step="0.5" min="0" placeholder="?"/>
+        <span class="unit-label">cm</span>
+      </div>
+      <button class="btn-primary" id="geo-verify-btn" onclick="checkGeo()">VERIFICA ✓</button>
+    </div>
+
+    <div id="geo-hint" class="hint-box" style="display:none;margin:0.5rem 0;"></div>
+    <div style="text-align:center;margin-top:0.5rem;">
+      <button class="btn-next" id="geo-next" onclick="nextGeo()">PROSSIMO PROBLEMA →</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================== CACCIA DIVISORI GAME ================== -->
+<div class="screen" id="caccia-screen">
+  <div class="game-header">
+    <div class="game-title">🎯 CACCIA AL DIVISORE</div>
+    <div class="hud">
+      <div class="hud-item">Punti <span id="cac-score">0</span></div>
+      <div class="timer-circle">
+        <svg viewBox="0 0 56 56" width="56" height="56">
+          <circle class="track" cx="28" cy="28" r="26"/>
+          <circle class="fill" id="cac-timer-fill" cx="28" cy="28" r="26"/>
+        </svg>
+        <div class="timer-number" id="cac-timer-num">30</div>
+      </div>
+      <button class="btn-back" onclick="stopCaccia(); goMenu()">✕ MENU</button>
+    </div>
+  </div>
+  <div class="question-box" style="margin:0 1rem 1rem;">
+    <div class="question-label">TROVA TUTTI I DIVISORI DI</div>
+    <div style="font-family:'Orbitron',monospace;font-size:3rem;color:var(--neon-yellow);text-shadow:0 0 30px var(--neon-yellow);" id="cac-number">24</div>
+    <div style="font-size:0.85rem;color:#8ab4d4;margin-top:0.5rem;">Clicca su tutti i numeri che dividono esattamente il numero dato</div>
+  </div>
+  <div class="num-grid" id="cac-grid"></div>
+  <div id="cac-hint" class="hint-box" style="display:none;margin:1rem;"></div>
+  <div style="text-align:center;margin-top:1rem;">
+    <button class="btn-next" id="cac-next" onclick="nextCaccia()">PROSSIMO →</button>
+  </div>
+</div>
+
+<!-- ================== RESULTS ================== -->
+<div class="screen" id="results-screen">
+  <div class="result-title" id="result-title">PARTITA FINITA!</div>
+  <span class="result-score-big" id="result-score">0</span>
+  <div class="star-rating" id="star-rating">⭐⭐⭐</div>
+  <div class="result-msg" id="result-msg">Ottimo lavoro!</div>
+  <div class="scoreboard">
+    <div class="scoreboard-title">📊 RIEPILOGO</div>
+    <div class="score-line"><span>Risposte corrette</span><span class="val" id="res-correct">0/0</span></div>
+    <div class="score-line"><span>Punteggio partita</span><span class="val" id="res-game-score">0</span></div>
+    <div class="score-line"><span>Punteggio totale</span><span class="val" id="res-total">0</span></div>
+  </div>
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;">
+    <button class="btn-primary" id="res-replay-btn">🔄 RIGIOCA</button>
+    <button class="btn-primary" style="background:linear-gradient(135deg,var(--neon-pink),var(--neon-yellow))" onclick="goMenu()">🏠 MENU</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STARS BACKGROUND
+// ============================================================
+const starsCanvas = document.getElementById('stars-canvas');
+const sCtx = starsCanvas.getContext('2d');
+let stars = [];
+
+function initStars() {
+  starsCanvas.width = window.innerWidth;
+  starsCanvas.height = window.innerHeight;
+  stars = [];
+  for (let i = 0; i < 200; i++) {
+    stars.push({
+      x: Math.random() * starsCanvas.width,
+      y: Math.random() * starsCanvas.height,
+      r: Math.random() * 1.5,
+      a: Math.random(),
+      speed: Math.random() * 0.005 + 0.002
+    });
+  }
+}
+
+function animateStars() {
+  sCtx.clearRect(0, 0, starsCanvas.width, starsCanvas.height);
+  stars.forEach(s => {
+    s.a += s.speed;
+    const alpha = (Math.sin(s.a) + 1) / 2 * 0.8 + 0.1;
+    sCtx.beginPath();
+    sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    sCtx.fillStyle = `rgba(200,240,255,${alpha})`;
+    sCtx.fill();
+  });
+  requestAnimationFrame(animateStars);
+}
+
+window.addEventListener('resize', initStars);
+initStars();
+animateStars();
+
+// ============================================================
+// STATE
+// ============================================================
+let totalScore = 0;
+let currentGame = '';
+let sessionCorrect = 0;
+let sessionTotal = 0;
+let sessionScore = 0;
+let comboCount = 0;
+
+// ============================================================
+// SCREEN NAV
+// ============================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goMenu() {
+  showScreen('menu-screen');
+  document.getElementById('total-score-display').textContent = totalScore;
+}
+
+// ============================================================
+// PARTICLES & EFFECTS
+// ============================================================
+function spawnParticles(x, y, correct) {
+  const emojis = correct ? ['⭐','✨','🌟','💫','🎉'] : ['💥','😵','❌'];
+  for (let i = 0; i < 5; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    p.style.left = (x - 20 + Math.random() * 40) + 'px';
+    p.style.top = (y - 20 + Math.random() * 40) + 'px';
+    p.style.animationDelay = (Math.random() * 0.3) + 's';
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1200);
+  }
+}
+
+function showFeedback(correct, x, y) {
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback ' + (correct ? 'correct' : 'wrong');
+  fb.textContent = correct ? ['ESATTO! ✓','OTTIMO! 🔥','PERFETTO! ⚡','BRAVO! 🌟'][Math.floor(Math.random()*4)] : ['SBAGLIATO ✗','RIPROVA! 💥','ERRORE! 😅'][Math.floor(Math.random()*3)];
+  fb.classList.add('show');
+  spawnParticles(x || window.innerWidth/2, y || window.innerHeight/2, correct);
+  setTimeout(() => fb.className = 'feedback', 900);
+}
+
+function updateCombo(correct) {
+  if (correct) {
+    comboCount++;
+    if (comboCount >= 2) {
+      const cd = document.getElementById('combo-display');
+      document.getElementById('combo-num').textContent = 'x' + comboCount;
+      cd.classList.add('show');
+      setTimeout(() => cd.classList.remove('show'), 1500);
+    }
+  } else {
+    comboCount = 0;
+  }
+}
+
+function getComboMultiplier() {
+  if (comboCount >= 5) return 3;
+  if (comboCount >= 3) return 2;
+  return 1;
+}
+
+// ============================================================
+// RESULTS
+// ============================================================
+function showResults(gameName, replayFn) {
+  totalScore += sessionScore;
+  document.getElementById('total-score-display').textContent = totalScore;
+
+  const pct = sessionTotal > 0 ? sessionCorrect / sessionTotal : 0;
+  const stars = pct >= 0.8 ? '⭐⭐⭐' : pct >= 0.5 ? '⭐⭐' : '⭐';
+  const msg = pct >= 0.8 ? 'Sei un campione della matematica! 🏆' :
+              pct >= 0.5 ? 'Buon lavoro! Continua ad allenarti! 💪' :
+              'Continua a studiare, ce la farai! 📚';
+
+  document.getElementById('result-title').textContent = 'PARTITA FINITA — ' + gameName;
+  document.getElementById('result-score').textContent = sessionScore;
+  document.getElementById('star-rating').textContent = stars;
+  document.getElementById('result-msg').textContent = msg;
+  document.getElementById('res-correct').textContent = sessionCorrect + '/' + sessionTotal;
+  document.getElementById('res-game-score').textContent = sessionScore + ' pt';
+  document.getElementById('res-total').textContent = totalScore + ' pt';
+
+  const rb = document.getElementById('res-replay-btn');
+  rb.onclick = replayFn;
+
+  showScreen('results-screen');
+}
+
+// ============================================================
+// GAME ROUTER
+// ============================================================
+function startGame(type) {
+  currentGame = type;
+  comboCount = 0;
+  sessionCorrect = 0;
+  sessionTotal = 0;
+  sessionScore = 0;
+
+  if (type === 'divisori') { initDivisori(); showScreen('divisori-screen'); }
+  else if (type === 'catch') { initCatch(); showScreen('catch-screen'); }
+  else if (type === 'geometria') { initGeo(); showScreen('geometria-screen'); }
+  else if (type === 'caccia') { initCaccia(); showScreen('caccia-screen'); }
+}
+
+// ============================================================
+// ============================================================
+//  GAME 1: DIVISORI & MULTIPLI QUIZ
+// ============================================================
+// ============================================================
+
+const divisoriQuestions = [
+  {
+    q: 'Qual è il MCD tra <span class="highlight">12</span> e <span class="highlight">18</span>?',
+    options: ['3','6','12','9'], correct: 1,
+    hint: '💡 I divisori di 12: 1,2,3,4,6,12 — I divisori di 18: 1,2,3,6,9,18 → Il più grande in comune è 6!'
+  },
+  {
+    q: 'Il numero <span class="highlight">36</span> è divisibile per <span class="highlight">4</span>?',
+    options: ['Sì, perché 36÷4=9','No, resto 2','No, non è pari','Sì, ma solo per caso'], correct: 0,
+    hint: '💡 Un numero è divisibile per 4 se le sue ultime due cifre formano un numero divisibile per 4. 36÷4=9 ✓'
+  },
+  {
+    q: 'Qual è il mcm tra <span class="highlight">4</span> e <span class="highlight">6</span>?',
+    options: ['12','24','8','6'], correct: 0,
+    hint: '💡 Multipli di 4: 4,8,12,16... — Multipli di 6: 6,12,18... → Il primo in comune è 12!'
+  },
+  {
+    q: '<span class="highlight">15</span> è un multiplo di <span class="highlight">3</span>?',
+    options: ['Sì, 3×5=15','No','Solo se consideriamo i negativi','Dipende'], correct: 0,
+    hint: '💡 15÷3=5 esattamente, senza resto. Quindi 15 è multiplo di 3!'
+  },
+  {
+    q: 'Quanti divisori ha il numero <span class="highlight">12</span>?',
+    options: ['4','5','6','8'], correct: 2,
+    hint: '💡 I divisori di 12 sono: 1, 2, 3, 4, 6, 12 → sono 6 in totale!'
+  },
+  {
+    q: 'Un numero è divisibile per <span class="highlight">9</span> se...',
+    options: ['finisce per 9','la somma delle sue cifre è divisibile per 9','è pari','finisce per 0 o 5'], correct: 1,
+    hint: '💡 Criterio: somma le cifre. Es: 252 → 2+5+2=9, divisibile per 9 ✓'
+  },
+  {
+    q: 'Il MCD di <span class="highlight">7</span> e <span class="highlight">13</span> è:',
+    options: ['7','1','91','13'], correct: 1,
+    hint: '💡 Quando due numeri sono entrambi primi, il loro MCD è sempre 1!'
+  },
+  {
+    q: 'Qual è il 5° multiplo di <span class="highlight">7</span>?',
+    options: ['28','35','42','45'], correct: 1,
+    hint: '💡 Multipli di 7: 7, 14, 21, 28, 35 → il 5° è 35!'
+  },
+  {
+    q: '<span class="highlight">48</span> è divisibile per <span class="highlight">6</span>?',
+    options: ['Sì, 48÷6=8','No','Solo per 3, non per 2','Sì, ma è anche divisibile per 48'], correct: 0,
+    hint: '💡 Un numero è divisibile per 6 se è divisibile sia per 2 che per 3. 48 è pari e 4+8=12 (div. per 3) ✓'
+  },
+  {
+    q: 'Il mcm di <span class="highlight">3</span>, <span class="highlight">4</span> e <span class="highlight">6</span> è:',
+    options: ['12','24','72','36'], correct: 0,
+    hint: '💡 Multipli di 6: 6,12,18... → 12 è divisibile per 3 (12÷3=4 ✓), per 4 (12÷4=3 ✓) e per 6 ✓'
+  }
+];
+
+let divIndex = 0;
+let divTimer = null;
+let divTimeLeft = 15;
+
+function initDivisori() {
+  divIndex = 0;
+  document.getElementById('div-score').textContent = '0';
+  sessionScore = 0;
+  loadDivQuestion();
+}
+
+function loadDivQuestion() {
+  if (divIndex >= divisoriQuestions.length) {
+    clearInterval(divTimer);
+    showResults('DIVISORI & MULTIPLI', () => startGame('divisori'));
+    return;
+  }
+
+  const q = divisoriQuestions[divIndex];
+  document.getElementById('div-qnum').textContent = divIndex + 1;
+  document.getElementById('div-progress').style.width = (divIndex / divisoriQuestions.length * 100) + '%';
+  document.getElementById('div-question').innerHTML = q.q;
+  document.getElementById('div-hint').style.display = 'none';
+
+  const grid = document.getElementById('div-answers');
+  grid.innerHTML = '';
+  q.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn';
+    btn.innerHTML = '<b style="color:var(--neon-cyan);font-family:Orbitron,monospace;margin-right:0.5em;">' + String.fromCharCode(65+i) + '.</b> ' + opt;
+    btn.onclick = (e) => checkDivAnswer(i, e);
+    grid.appendChild(btn);
+  });
+
+  startDivTimer();
+}
+
+function startDivTimer() {
+  clearInterval(divTimer);
+  divTimeLeft = 15;
+  updateTimerUI(divTimeLeft, 15, 'timer-fill', 'timer-num');
+  divTimer = setInterval(() => {
+    divTimeLeft--;
+    updateTimerUI(divTimeLeft, 15, 'timer-fill', 'timer-num');
+    if (divTimeLeft <= 0) {
+      clearInterval(divTimer);
+      timeOutDiv();
+    }
+  }, 1000);
+}
+
+function updateTimerUI(val, max, fillId, numId) {
+  const circumference = 163;
+  const offset = circumference * (1 - val / max);
+  const fill = document.getElementById(fillId);
+  fill.style.strokeDashoffset = offset;
+  fill.style.stroke = val <= 5 ? 'var(--neon-pink)' : val <= 8 ? 'var(--neon-yellow)' : 'var(--neon-cyan)';
+  document.getElementById(numId).textContent = val;
+}
+
+function timeOutDiv() {
+  const q = divisoriQuestions[divIndex];
+  const btns = document.querySelectorAll('.answer-btn');
+  btns.forEach((b, i) => { if (i === q.correct) b.classList.add('correct'); });
+  showDivHint(q.hint);
+  sessionTotal++;
+  updateCombo(false);
+  setTimeout(() => { divIndex++; loadDivQuestion(); }, 2000);
+}
+
+function checkDivAnswer(idx, e) {
+  clearInterval(divTimer);
+  const q = divisoriQuestions[divIndex];
+  const btns = document.querySelectorAll('.answer-btn');
+  btns.forEach(b => b.style.pointerEvents = 'none');
+  sessionTotal++;
+
+  const isCorrect = idx === q.correct;
+  btns[idx].classList.add(isCorrect ? 'correct' : 'wrong');
+  if (!isCorrect) btns[q.correct].classList.add('correct');
+
+  const rect = e.target.getBoundingClientRect();
+  showFeedback(isCorrect, rect.left + rect.width/2, rect.top);
+  updateCombo(isCorrect);
+
+  if (isCorrect) {
+    sessionCorrect++;
+    const pts = 100 * getComboMultiplier() + divTimeLeft * 5;
+    sessionScore += pts;
+    document.getElementById('div-score').textContent = sessionScore;
+  } else {
+    showDivHint(q.hint);
+  }
+
+  setTimeout(() => { divIndex++; loadDivQuestion(); }, isCorrect ? 1200 : 2500);
+}
+
+function showDivHint(hint) {
+  const hb = document.getElementById('div-hint');
+  hb.innerHTML = hint;
+  hb.style.display = 'block';
+}
+
+// ============================================================
+// ============================================================
+//  GAME 2: CATCH GAME (MULTIPLI RUSH)
+// ============================================================
+// ============================================================
+
+const catchCanvas = document.getElementById('catch-canvas');
+const cCtx = catchCanvas.getContext('2d');
+let catchAnimFrame = null;
+let basket = { x: 350, y: 380, w: 80, h: 20 };
+let balls = [];
+let catchRunning = false;
+let catchTargetNum = 3;
+let catchLives = 3;
+let catchLevelNum = 1;
+let catchBallSpeed = 1.5;
+let catchSpawnInterval = null;
+
+function initCatch() {
+  catchLives = 3;
+  catchLevelNum = 1;
+  catchBallSpeed = 1.5;
+  sessionScore = 0;
+  catchTargetNum = [2,3,4,5,6,7][Math.floor(Math.random() * 6)];
+  balls = [];
+  catchRunning = true;
+
+  document.getElementById('catch-target').textContent = catchTargetNum;
+  document.getElementById('catch-level').textContent = catchLevelNum;
+  document.getElementById('catch-score').textContent = '0';
+  updateCatchLives();
+
+  catchCanvas.addEventListener('mousemove', moveCatchBasket);
+  catchCanvas.addEventListener('touchmove', touchCatchBasket, { passive: false });
+
+  clearInterval(catchSpawnInterval);
+  catchSpawnInterval = setInterval(spawnCatchBall, 1200);
+  catchLoop();
+}
+
+function stopCatch() {
+  catchRunning = false;
+  clearInterval(catchSpawnInterval);
+  cancelAnimationFrame(catchAnimFrame);
+  catchCanvas.removeEventListener('mousemove', moveCatchBasket);
+}
+
+function moveCatchBasket(e) {
+  const rect = catchCanvas.getBoundingClientRect();
+  const scaleX = catchCanvas.width / rect.width;
+  basket.x = (e.clientX - rect.left) * scaleX - basket.w / 2;
+  basket.x = Math.max(0, Math.min(catchCanvas.width - basket.w, basket.x));
+}
+
+function touchCatchBasket(e) {
+  e.preventDefault();
+  const rect = catchCanvas.getBoundingClientRect();
+  const scaleX = catchCanvas.width / rect.width;
+  basket.x = (e.touches[0].clientX - rect.left) * scaleX - basket.w / 2;
+  basket.x = Math.max(0, Math.min(catchCanvas.width - basket.w, basket.x));
+}
+
+function updateCatchLives() {
+  document.getElementById('catch-lives').textContent = '❤️'.repeat(catchLives) + '🖤'.repeat(3 - catchLives);
+}
+
+function isMultiple(n, target) { return n % target === 0; }
+
+function spawnCatchBall() {
+  if (!catchRunning) return;
+  const num = Math.floor(Math.random() * 40) + 1;
+  const isGood = isMultiple(num, catchTargetNum);
+  const colors = isGood ?
+    ['#00f5ff','#39ff14','#ffd60a'] :
+    ['#ff006e','#ff4500','#cc0044'];
+  balls.push({
+    x: 40 + Math.random() * (catchCanvas.width - 80),
+    y: -20, num,
+    speed: catchBallSpeed + Math.random() * 0.5,
+    isGood,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    r: 28
+  });
+}
+
+function catchLoop() {
+  if (!catchRunning) return;
+  cCtx.clearRect(0, 0, catchCanvas.width, catchCanvas.height);
+
+  // background grid
+  cCtx.strokeStyle = 'rgba(0,245,255,0.05)';
+  cCtx.lineWidth = 1;
+  for (let x = 0; x < catchCanvas.width; x += 40) {
+    cCtx.beginPath(); cCtx.moveTo(x,0); cCtx.lineTo(x,catchCanvas.height); cCtx.stroke();
+  }
+  for (let y = 0; y < catchCanvas.height; y += 40) {
+    cCtx.beginPath(); cCtx.moveTo(0,y); cCtx.lineTo(catchCanvas.width,y); cCtx.stroke();
+  }
+
+  // draw basket
+  const bx = basket.x, by = basket.y, bw = basket.w, bh = basket.h;
+  const grad = cCtx.createLinearGradient(bx, by, bx+bw, by);
+  grad.addColorStop(0, '#00f5ff');
+  grad.addColorStop(1, '#bf5af2');
+  cCtx.fillStyle = grad;
+  cCtx.beginPath();
+  cCtx.roundRect(bx, by, bw, bh, 8);
+  cCtx.fill();
+  cCtx.shadowColor = '#00f5ff';
+  cCtx.shadowBlur = 15;
+  cCtx.fill();
+  cCtx.shadowBlur = 0;
+
+  // balls
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const b = balls[i];
+    b.y += b.speed;
+
+    // draw ball
+    cCtx.beginPath();
+    cCtx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+    const ballGrad = cCtx.createRadialGradient(b.x-5, b.y-5, 2, b.x, b.y, b.r);
+    ballGrad.addColorStop(0, '#fff');
+    ballGrad.addColorStop(0.3, b.color);
+    ballGrad.addColorStop(1, b.color + '88');
+    cCtx.fillStyle = ballGrad;
+    cCtx.shadowColor = b.color;
+    cCtx.shadowBlur = b.isGood ? 20 : 8;
+    cCtx.fill();
+    cCtx.shadowBlur = 0;
+
+    cCtx.fillStyle = '#000';
+    cCtx.font = 'bold 13px Orbitron, monospace';
+    cCtx.textAlign = 'center';
+    cCtx.textBaseline = 'middle';
+    cCtx.fillText(b.num, b.x, b.y);
+
+    // catch check
+    if (b.y + b.r >= by && b.y - b.r <= by + bh &&
+        b.x >= bx && b.x <= bx + bw) {
+      if (b.isGood) {
+        sessionCorrect++;
+        sessionScore += 50 * getComboMultiplier();
+        comboCount++;
+        document.getElementById('catch-score').textContent = sessionScore;
+        spawnCatchParticle(b.x, by, '⭐ +50');
+      } else {
+        catchLives--;
+        comboCount = 0;
+        updateCatchLives();
+        spawnCatchParticle(b.x, by, '💥');
+        if (catchLives <= 0) {
+          catchRunning = false;
+          clearInterval(catchSpawnInterval);
+          sessionTotal = sessionCorrect + catchLives < 0 ? sessionCorrect : sessionCorrect + 3;
+          showResults('MULTIPLI RUSH', () => startGame('catch'));
+          return;
+        }
+      }
+      balls.splice(i, 1);
+      continue;
+    }
+
+    // missed good ball
+    if (b.y - b.r > catchCanvas.height) {
+      if (b.isGood) {
+        catchLives--;
+        comboCount = 0;
+        updateCatchLives();
+        if (catchLives <= 0) {
+          catchRunning = false;
+          clearInterval(catchSpawnInterval);
+          sessionTotal = sessionCorrect + 3;
+          showResults('MULTIPLI RUSH', () => startGame('catch'));
+          return;
+        }
+      }
+      balls.splice(i, 1);
+    }
+  }
+
+  // level up
+  if (sessionScore > catchLevelNum * 500) {
+    catchLevelNum++;
+    catchBallSpeed += 0.3;
+    catchTargetNum = [2,3,4,5,6,7,8,9][Math.floor(Math.random() * 8)];
+    document.getElementById('catch-level').textContent = catchLevelNum;
+    document.getElementById('catch-target').textContent = catchTargetNum;
+    balls = [];
+    spawnCatchParticle(catchCanvas.width/2, catchCanvas.height/2, '⬆ LEVEL UP!');
+  }
+
+  catchAnimFrame = requestAnimationFrame(catchLoop);
+}
+
+function spawnCatchParticle(x, y, text) {
+  const rect = catchCanvas.getBoundingClientRect();
+  const scaleX = rect.width / catchCanvas.width;
+  const scaleY = rect.height / catchCanvas.height;
+  const p = document.createElement('div');
+  p.className = 'particle';
+  p.textContent = text;
+  p.style.left = (rect.left + x * scaleX) + 'px';
+  p.style.top = (rect.top + y * scaleY) + 'px';
+  p.style.fontSize = '1.2rem';
+  p.style.color = 'var(--neon-yellow)';
+  p.style.fontFamily = 'Orbitron, monospace';
+  p.style.fontWeight = '700';
+  document.body.appendChild(p);
+  setTimeout(() => p.remove(), 1000);
+}
+
+// ============================================================
+// ============================================================
+//  GAME 3: GEOMETRIA DEI SEGMENTI — DUE SEGMENTI INTERATTIVI
+// ============================================================
+// ============================================================
+
+// ---- Generatore problemi ----
+// Ogni problema ha: testo, ansA (segmento lungo), ansB (segmento corto),
+// labelA, labelB, tipo ('somma'|'differenza'), valore noto, rapporto k
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function rnd(n) { return Math.round(n * 10) / 10; }
+
+const ratioWords = {2:'doppio', 3:'triplo', 4:'quadruplo', 5:'quintuplo', 6:'sestuplo'};
+
+function makeGeoProblems() {
+  const problems = [];
+
+  // ── FACILE 1: somma nota, AB doppio di CD
+  (() => {
+    const k=2, b=pick([3,4,5,6]), a=k*b, S=a+b;
+    problems.push({ ansA:a, ansB:b, labelA:'AB', labelB:'CD',
+      text:`Due segmenti <b>AB</b> e <b>CD</b> hanno una somma di <span class="num">${S} cm</span>.<br>
+            AB è il <span class="num">${ratioWords[k]}</span> di CD.<br>
+            Quanto misurano AB e CD?`,
+      hint:`💡 AB=2·CD → S = AB+CD = 3CD = ${S} → CD=${b} cm, AB=${a} cm` });
+  })();
+
+  // ── FACILE 2: somma nota, AB triplo di CD
+  (() => {
+    const k=3, b=pick([2,3,4,5]), a=k*b, S=a+b;
+    problems.push({ ansA:a, ansB:b, labelA:'AB', labelB:'CD',
+      text:`La somma dei segmenti <b>AB</b> e <b>CD</b> è <span class="num">${S} cm</span>.<br>
+            AB è il <span class="num">${ratioWords[k]}</span> di CD.<br>
+            Trova AB e CD.`,
+      hint:`💡 AB=3·CD → S = 4CD = ${S} → CD=${b} cm, AB=${a} cm` });
+  })();
+
+  // ── MEDIO 1: differenza nota, AB doppio di CD
+  (() => {
+    const k=2, b=pick([4,5,6,7]), a=k*b, D=a-b;
+    problems.push({ ansA:a, ansB:b, labelA:'AB', labelB:'CD',
+      text:`<b>AB</b> è il <span class="num">${ratioWords[k]}</span> di <b>CD</b>.<br>
+            La differenza AB − CD = <span class="num">${D} cm</span>.<br>
+            Calcola AB e CD.`,
+      hint:`💡 AB=2CD → AB−CD=CD=${D} → CD=${b} cm, AB=${a} cm` });
+  })();
+
+  // ── MEDIO 2: differenza nota, AB triplo di CD
+  (() => {
+    const k=3, b=pick([3,4,5,6]), a=k*b, D=a-b;
+    problems.push({ ansA:a, ansB:b, labelA:'AB', labelB:'CD',
+      text:`<b>AB</b> è il <span class="num">${ratioWords[k]}</span> di <b>CD</b>.<br>
+            AB − CD = <span class="num">${D} cm</span>.<br>
+            Quanto misura ciascuno?`,
+      hint:`💡 AB=3CD → AB−CD=2CD=${D} → CD=${b} cm, AB=${a} cm` });
+  })();
+
+  // ── MEDIO 3: somma nota, AB quadruplo di CD
+  (() => {
+    const k=4, b=pick([2,3,4]), a=k*b, S=a+b;
+    problems.push({ ansA:a, ansB:b, labelA:'PQ', labelB:'RS',
+      text:`La somma <b>PQ + RS</b> = <span class="num">${S} cm</span>.<br>
+            PQ è il <span class="num">${ratioWords[k]}</span> di RS.<br>
+            Trovane le misure.`,
+      hint:`💡 PQ=4RS → 5RS=${S} → RS=${b} cm, PQ=${a} cm` });
+  })();
+
+  // ── MEDIO 4: differenza nota, AB quadruplo di CD
+  (() => {
+    const k=4, b=pick([2,3,4]), a=k*b, D=a-b;
+    problems.push({ ansA:a, ansB:b, labelA:'MN', labelB:'OP',
+      text:`<b>MN</b> è il <span class="num">${ratioWords[k]}</span> di <b>OP</b>.<br>
+            La differenza MN − OP = <span class="num">${D} cm</span>.<br>
+            Calcola i due segmenti.`,
+      hint:`💡 MN=4OP → MN−OP=3OP=${D} → OP=${b} cm, MN=${a} cm` });
+  })();
+
+  // ── DIFFICILE 1: somma nota, AB quintuplo di CD
+  (() => {
+    const k=5, b=pick([2,3,4]), a=k*b, S=a+b;
+    problems.push({ ansA:a, ansB:b, labelA:'AB', labelB:'CD',
+      text:`<b>AB + CD</b> = <span class="num">${S} cm</span> e AB è il <span class="num">${ratioWords[k]}</span> di CD.<br>
+            Quanto misurano i due segmenti?`,
+      hint:`💡 AB=5CD → 6CD=${S} → CD=${b} cm, AB=${a} cm` });
+  })();
+
+  // ── DIFFICILE 2: sistema somma + differenza
+  (() => {
+    const b=pick([3,4,5,6]), extra=pick([2,4,6,8]), a=b+extra;
+    const S=a+b, D=a-b;
+    problems.push({ ansA:a, ansB:b, labelA:'AB', labelB:'CD',
+      text:`Hai due segmenti <b>AB</b> e <b>CD</b> con:<br>
+            • Somma: AB + CD = <span class="num">${S} cm</span><br>
+            • Differenza: AB − CD = <span class="num">${D} cm</span><br>
+            Calcola AB e CD.`,
+      hint:`💡 AB=(S+D)/2=(${S}+${D})/2=${a} cm &nbsp; CD=(S−D)/2=(${S}−${D})/2=${b} cm` });
+  })();
+
+  // ── DIFFICILE 3: differenza nota, AB sestuplo di CD
+  (() => {
+    const k=6, b=pick([2,3]), a=k*b, D=a-b;
+    problems.push({ ansA:a, ansB:b, labelA:'EF', labelB:'GH',
+      text:`<b>EF</b> è il <span class="num">${ratioWords[k]}</span> di <b>GH</b>.<br>
+            EF − GH = <span class="num">${D} cm</span>.<br>
+            Trovane le lunghezze.`,
+      hint:`💡 EF=6GH → EF−GH=5GH=${D} → GH=${b} cm, EF=${a} cm` });
+  })();
+
+  // ── DIFFICILE 4: rapporto 3:1, somma e doppia differenza
+  (() => {
+    const b=pick([3,4,5]), a=3*b, S=a+b, D=a-b;
+    problems.push({ ansA:a, ansB:b, labelA:'AB', labelB:'CD',
+      text:`I segmenti <b>AB</b> e <b>CD</b> hanno rapporto <span class="num">3 : 1</span>.<br>
+            La loro somma è <span class="num">${S} cm</span>.<br>
+            Verifica che AB − CD = <span class="num">${D} cm</span> e calcola entrambi.`,
+      hint:`💡 AB=3k, CD=k → 4k=${S} → k=${b} → CD=${b} cm, AB=${a} cm. Diff=${a}−${b}=${D} ✓` });
+  })();
+
+  return problems;
+}
+
+const geoProblems = [
+  // ── FACILE 1: somma diretta
+  {
+    setup: () => {
+      const AB = pick([3, 4, 5, 6]);
+      const BC = pick([2, 3, 4]);
+      const AC = AB + BC;
+      return {
+        text: `Sul segmento AC il punto B è interno con AB = <span class="num">${AB} cm</span> e BC = <span class="num">${BC} cm</span>.<br>Calcola AC.`,
+        answer: AC, unit: 'cm',
+        draw: (ctx,w,h) => drawThreePoints(ctx,w,h,AB,BC,AC,'A','B','C'),
+        hint: `💡 B interno → AC = AB + BC = ${AB} + ${BC} = <b>${AC} cm</b>`
+      };
+    }
+  },
+  // ── FACILE 2: sottrazione diretta
+  {
+    setup: () => {
+      const AC = pick([10,12,14,16]);
+      const AB = pick([4,5,6,7]);
+      const BC = AC - AB;
+      return {
+        text: `AC = <span class="num">${AC} cm</span>. B è interno con AB = <span class="num">${AB} cm</span>.<br>Calcola BC.`,
+        answer: BC, unit: 'cm',
+        draw: (ctx,w,h) => drawThreePoints(ctx,w,h,AB,BC,AC,'A','B','C'),
+        hint: `💡 BC = AC − AB = ${AC} − ${AB} = <b>${BC} cm</b>`
+      };
+    }
+  },
+  // ── MEDIO 1: AB è il triplo di BC, somma nota
+  {
+    setup: () => {
+      const BC = pick([3,4,5,6]);
+      const AB = 3 * BC;
+      const AC = AB + BC;
+      return {
+        text: `B è interno ad AC. AB è il <span class="num">triplo</span> di BC e AC = <span class="num">${AC} cm</span>.<br>Calcola AB e BC.`,
+        answer: BC, unit: 'cm (BC)',
+        draw: (ctx,w,h) => drawThreePoints(ctx,w,h,AB,BC,AC,'A','B','C'),
+        hint: `💡 AB = 3·BC → AC = AB + BC = 3BC + BC = 4BC → BC = ${AC}/4 = <b>${BC} cm</b>, AB = 3×${BC} = <b>${AB} cm</b>`
+      };
+    }
+  },
+  // ── MEDIO 2: AB è il doppio di BC, conoscendo la differenza
+  {
+    setup: () => {
+      const BC = pick([4,5,6,7,8]);
+      const AB = 2 * BC;
+      const diff = AB - BC; // = BC
+      return {
+        text: `B è interno ad AC con AB = <span class="num">2·BC</span>.<br>La differenza AB − BC = <span class="num">${diff} cm</span>.<br>Calcola AC.`,
+        answer: AB + BC, unit: 'cm',
+        draw: (ctx,w,h) => drawThreePoints(ctx,w,h,AB,BC,AB+BC,'A','B','C'),
+        hint: `💡 AB − BC = BC (perché AB=2BC) → BC = ${diff} cm, AB = ${AB} cm → AC = ${AB+BC} cm`
+      };
+    }
+  },
+  // ── MEDIO 3: sistema somma e differenza
+  {
+    setup: () => {
+      const BC = pick([3,4,5,6]);
+      const AB = BC + pick([2,4,6]);
+      const sum = AB + BC;
+      const diff = AB - BC;
+      return {
+        text: `B interno ad AC. AB + BC = <span class="num">${sum} cm</span> e AB − BC = <span class="num">${diff} cm</span>.<br>Calcola AB e BC, poi trova AC.`,
+        answer: sum, unit: 'cm (AC)',
+        draw: (ctx,w,h) => drawThreePoints(ctx,w,h,AB,BC,sum,'A','B','C'),
+        hint: `💡 Sistema: AB+BC=${sum}, AB−BC=${diff} → AB=(${sum}+${diff})/2=<b>${AB} cm</b>, BC=(${sum}−${diff})/2=<b>${BC} cm</b> → AC = AB+BC = <b>${sum} cm</b>`
+      };
+    }
+  },
+  // ── MEDIO 4: punto medio + triplo
+  {
+    setup: () => {
+      const MB = pick([4,6,8,10]);
+      const AM = 3 * MB;  // AM è il triplo di MB
+      const AB = AM + MB;
+      return {
+        text: `M è interno ad AB con AM = <span class="num">3·MB</span>.<br>Se MB = <span class="num">${MB} cm</span>, calcola AB.`,
+        answer: AB, unit: 'cm',
+        draw: (ctx,w,h) => drawThreePoints(ctx,w,h,AM,MB,AB,'A','M','B'),
+        hint: `💡 AM = 3·MB = 3×${MB} = ${AM} cm → AB = AM + MB = ${AM} + ${MB} = <b>${AB} cm</b>`
+      };
+    }
+  },
+  // ── DIFFICILE 1: tre punti con relazioni tra segmenti
+  {
+    setup: () => {
+      const PC = pick([3,4,5]);
+      const BP = 2 * PC;
+      const AB = PC + 1;
+      const AC = AB + BP + PC;
+      return {
+        text: `A, B, P, C sono su una retta in quest'ordine.<br>AB = <span class="num">${AB} cm</span>, BP = <span class="num">2·PC</span>, PC = <span class="num">${PC} cm</span>.<br>Calcola AC.`,
+        answer: AC, unit: 'cm',
+        draw: (ctx,w,h) => drawFourSegments(ctx,w,h,AB,BP,PC,'A','B','P','C'),
+        hint: `💡 BP = 2·PC = 2×${PC} = ${BP} cm → AC = AB+BP+PC = ${AB}+${BP}+${PC} = <b>${AC} cm</b>`
+      };
+    }
+  },
+  // ── DIFFICILE 2: M punto medio + N su MB, calcola AN
+  {
+    setup: () => {
+      const AB = pick([12,16,20,24]);
+      const AM = AB / 2;
+      const MN = AM / 2; // N punto medio di MB = AM
+      const AN = AM + MN;
+      return {
+        text: `M è il punto medio di AB con AB = <span class="num">${AB} cm</span>.<br>N è il punto medio di MB.<br>Calcola AN.`,
+        answer: AN, unit: 'cm',
+        draw: (ctx,w,h) => drawFourPoints(ctx,w,h,AB),
+        hint: `💡 MB = AB/2 = ${AM} cm. MN = MB/2 = ${MN} cm. AN = AM + MN = ${AM} + ${MN} = <b>${AN} cm</b>`
+      };
+    }
+  },
+  // ── DIFFICILE 3: differenza e triplo insieme
+  {
+    setup: () => {
+      const x = pick([3,4,5,6]);
+      const AB = 3*x + 2;
+      const CD = x;
+      const sum = AB + CD;
+      const diff = AB - CD;
+      return {
+        text: `Il segmento AB è tale che AB − CD = <span class="num">${diff} cm</span> e AB = <span class="num">3·CD + 2</span>.<br>Calcola AB, CD e la loro somma.`,
+        answer: sum, unit: 'cm (somma)',
+        draw: (ctx,w,h) => drawTwoSegments(ctx,w,h,AB,CD),
+        hint: `💡 AB = 3CD+2 e AB−CD=2CD+2=${diff} → 2CD=${diff}-2=${diff-2} → CD=${x} cm, AB=${AB} cm → Somma = <b>${sum} cm</b>`
+      };
+    }
+  },
+  // ── DIFFICILE 4: punto interno con somma e rapporto 1:3
+  {
+    setup: () => {
+      const unit = pick([2,3,4]);
+      const BC = unit;
+      const AB = 3 * unit;
+      const AC = AB + BC;
+      const diff = AB - BC;
+      return {
+        text: `B divide AC nel rapporto AB:BC = <span class="num">3:1</span>.<br>AB − BC = <span class="num">${diff} cm</span>.<br>Calcola AC.`,
+        answer: AC, unit: 'cm',
+        draw: (ctx,w,h) => drawThreePoints(ctx,w,h,AB,BC,AC,'A','B','C'),
+        hint: `💡 AB=3k, BC=k → AB−BC=2k=${diff} → k=${unit} → AB=${AB} cm, BC=${BC} cm → AC = <b>${AC} cm</b>`
+      };
+    }
+  }
+];
+
+let geoQueue = [];
+let geoIndex = 0;
+let currentGeoProblem = null;
+let geoAnswered = false;
+
+// ---- Canvas: disegna DUE segmenti separati in tempo reale ----
+function drawGeoCanvas(valA, valB, state) {
+  const canvas = document.getElementById('geo-canvas');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth || 660;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const p = currentGeoProblem;
+  if (!p) return;
+
+  const margin = 44;
+  const maxW = W - margin * 2;
+  const maxVal = Math.max(p.ansA, p.ansB, 1);
+  const colA = state==='correct' ? '#39ff14' : state==='wrong' ? '#ff006e' : '#00f5ff';
+  const colB = state==='correct' ? '#39ff14' : state==='wrong' ? '#ff4444' : '#ff006e';
+
+  function drawSeg(rowY, val, ansVal, colMain, labelName) {
+    const w = (Math.max(val,0) / maxVal) * maxW;
+    const draft = (val <= 0);
+    // sfondo tratteggiato
+    ctx.save();
+    ctx.strokeStyle = colMain + '25'; ctx.lineWidth = 4; ctx.setLineDash([6,6]);
+    ctx.beginPath(); ctx.moveTo(margin, rowY); ctx.lineTo(margin+maxW, rowY); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+    // segmento
+    if (w > 2) {
+      const gr = ctx.createLinearGradient(margin,0,margin+w,0);
+      gr.addColorStop(0, colMain); gr.addColorStop(1, colMain+'66');
+      ctx.save();
+      ctx.shadowColor = colMain; ctx.shadowBlur = draft ? 0 : 16;
+      ctx.strokeStyle = gr; ctx.lineWidth = draft ? 2 : 7;
+      ctx.beginPath(); ctx.moveTo(margin, rowY); ctx.lineTo(margin+w, rowY); ctx.stroke();
+      ctx.restore();
+    }
+    // estremi
+    const endX = w > 2 ? margin+w : margin + maxW*0.35;
+    [[margin, labelName[0]], [endX, labelName[labelName.length-1]]].forEach(([x, lbl]) => {
+      ctx.save();
+      ctx.strokeStyle = colMain; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(x, rowY-11); ctx.lineTo(x, rowY+11); ctx.stroke();
+      ctx.fillStyle = colMain; ctx.font = 'bold 15px Orbitron,monospace';
+      ctx.textAlign = 'center'; ctx.fillText(lbl, x, rowY-20);
+      ctx.restore();
+    });
+    // valore
+    const midX = margin + (w > 2 ? w/2 : maxW*0.17);
+    ctx.save();
+    ctx.fillStyle = draft ? '#444' : '#ffd60a';
+    ctx.font = (draft ? 'italic ' : 'bold ') + '13px Exo 2,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(draft ? '? cm' : val + ' cm', midX, rowY + 27);
+    ctx.restore();
+    // label nome
+    ctx.save();
+    ctx.fillStyle = colMain; ctx.font = '11px Orbitron,monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(labelName, margin, rowY - 36);
+    ctx.restore();
+  }
+
+  drawSeg(H*0.33, valA > 0 ? valA : 0, p.ansA, colA, p.labelA);
+  drawSeg(H*0.73, valB > 0 ? valB : 0, p.ansB, colB, p.labelB);
+}
+
+function onGeoInput() {
+  const a = parseFloat(document.getElementById('geo-ans-a').value) || 0;
+  const b = parseFloat(document.getElementById('geo-ans-b').value) || 0;
+  drawGeoCanvas(a, b, 'idle');
+}
+
+function initGeo() {
+  geoQueue = makeGeoProblems();
+  geoIndex = 0;
+  sessionScore = 0;
+  document.getElementById('geo-score').textContent = '0';
+  loadGeoQuestion();
+}
+
+function loadGeoQuestion() {
+  if (geoIndex >= geoQueue.length) {
+    showResults('GEOMETRIA DEI SEGMENTI', () => startGame('geometria'));
+    return;
+  }
+  geoAnswered = false;
+  currentGeoProblem = geoQueue[geoIndex];
+  sessionTotal++;
+
+  document.getElementById('geo-qnum').textContent = geoIndex + 1;
+  document.getElementById('geo-problem').innerHTML = currentGeoProblem.text;
+  document.getElementById('geo-label-a').textContent = currentGeoProblem.labelA;
+  document.getElementById('geo-label-b').textContent = currentGeoProblem.labelB;
+
+  const inpA = document.getElementById('geo-ans-a');
+  const inpB = document.getElementById('geo-ans-b');
+  inpA.value = ''; inpB.value = '';
+  inpA.disabled = false; inpB.disabled = false;
+
+  document.getElementById('row-a').className = 'seg-input-row';
+  document.getElementById('row-b').className = 'seg-input-row';
+  document.getElementById('geo-hint').style.display = 'none';
+  document.getElementById('geo-next').classList.remove('visible');
+  document.getElementById('geo-verify-btn').style.display = 'inline-block';
+
+  inpA.oninput = onGeoInput;
+  inpB.oninput = onGeoInput;
+
+  setTimeout(() => drawGeoCanvas(0, 0, 'idle'), 50);
+}
+
+function checkGeo() {
+  if (geoAnswered) return;
+  const valA = parseFloat(document.getElementById('geo-ans-a').value);
+  const valB = parseFloat(document.getElementById('geo-ans-b').value);
+
+  if (isNaN(valA) || isNaN(valB)) {
+    const hb = document.getElementById('geo-hint');
+    hb.innerHTML = '⚠️ Inserisci <b>entrambi</b> i valori prima di verificare!';
+    hb.style.display = 'block';
+    hb.style.borderColor = 'var(--neon-yellow)';
+    hb.style.color = '#ffd60a';
+    hb.style.background = 'rgba(255,214,10,0.07)';
+    return;
+  }
+
+  geoAnswered = true;
+  document.getElementById('geo-ans-a').disabled = true;
+  document.getElementById('geo-ans-b').disabled = true;
+  document.getElementById('geo-verify-btn').style.display = 'none';
+
+  const p = currentGeoProblem;
+  const okA = Math.abs(valA - p.ansA) < 0.3;
+  const okB = Math.abs(valB - p.ansB) < 0.3;
+  const swapped = Math.abs(valA - p.ansB) < 0.3 && Math.abs(valB - p.ansA) < 0.3;
+  const isCorrect = (okA && okB) || swapped;
+
+  document.getElementById('row-a').className = 'seg-input-row ' + ((okA||swapped) ? 'correct-row' : 'wrong-row');
+  document.getElementById('row-b').className = 'seg-input-row ' + ((okB||swapped) ? 'correct-row' : 'wrong-row');
+
+  drawGeoCanvas(isCorrect ? p.ansA : valA, isCorrect ? p.ansB : valB, isCorrect ? 'correct' : 'wrong');
+
+  const hb = document.getElementById('geo-hint');
+  if (isCorrect) {
+    sessionCorrect++;
+    const pts = 150 * getComboMultiplier();
+    sessionScore += pts;
+    document.getElementById('geo-score').textContent = sessionScore;
+    hb.innerHTML = `<strong>✅ ESATTO! +${pts} pt</strong><br>${p.hint}`;
+    hb.style.background = 'rgba(57,255,20,0.08)';
+    hb.style.borderColor = 'var(--neon-green)';
+    hb.style.color = '#afffaa';
+    showFeedback(true); updateCombo(true);
+  } else {
+    hb.innerHTML = `<strong>❌ NON ESATTO</strong> — Risposta corretta: <b style="color:var(--neon-yellow)">${p.labelA} = ${p.ansA} cm &nbsp;|&nbsp; ${p.labelB} = ${p.ansB} cm</b><br>${p.hint}`;
+    hb.style.background = 'rgba(255,0,110,0.08)';
+    hb.style.borderColor = 'var(--neon-pink)';
+    hb.style.color = '#ffaacc';
+    showFeedback(false); updateCombo(false);
+  }
+  hb.style.display = 'block';
+  document.getElementById('geo-next').classList.add('visible');
+  geoIndex++;
+}
+
+function nextGeo() {
+  document.getElementById('geo-next').classList.remove('visible');
+  loadGeoQuestion();
+}
+
+// ============================================================
+// ============================================================
+//  GAME 4: CACCIA AL DIVISORE
+// ============================================================
+// ============================================================
+
+const cacciaNumbers = [12,18,24,30,36,48,60,72,100,120];
+let cacciaIndex = 0;
+let cacciaTimer = null;
+let cacciaTimeLeft = 30;
+let cacciaTargetNum = 12;
+let cacciaSelected = [];
+let cacciaAnswered = false;
+let cacciaCorrectDivisors = [];
+
+function getDivisors(n) {
+  const divs = [];
+  for (let i = 1; i <= n; i++) { if (n % i === 0) divs.push(i); }
+  return divs;
+}
+
+function initCaccia() {
+  cacciaIndex = 0;
+  sessionScore = 0;
+  document.getElementById('cac-score').textContent = '0';
+  loadCacciaRound();
+}
+
+function loadCacciaRound() {
+  if (cacciaIndex >= cacciaNumbers.length) {
+    clearInterval(cacciaTimer);
+    showResults('CACCIA AL DIVISORE', () => startGame('caccia'));
+    return;
+  }
+  cacciaAnswered = false;
+  cacciaSelected = [];
+  cacciaTargetNum = cacciaNumbers[cacciaIndex];
+  cacciaCorrectDivisors = getDivisors(cacciaTargetNum);
+  sessionTotal++;
+
+  document.getElementById('cac-number').textContent = cacciaTargetNum;
+  document.getElementById('cac-hint').style.display = 'none';
+  document.getElementById('cac-next').style.display = 'none';
+
+  // Genera griglia: tutti i divisori + non-divisori da un pool ampio (1..2*n)
+  // così non rischiamo loop infiniti anche per numeri piccoli
+  const divisorSet = new Set(cacciaCorrectDivisors);
+  const nonDivisors = [];
+  for (let i = 1; i <= cacciaTargetNum * 2; i++) {
+    if (!divisorSet.has(i) && i !== cacciaTargetNum) nonDivisors.push(i);
+  }
+  // mescoliamo i non-divisori e ne prendiamo abbastanza da arrivare a 15 celle totali
+  const shuffledNon = nonDivisors.sort(() => Math.random() - 0.5);
+  const needed = Math.max(0, 15 - cacciaCorrectDivisors.length);
+  let gridNums = [...cacciaCorrectDivisors, ...shuffledNon.slice(0, needed)];
+  gridNums = gridNums.sort(() => Math.random() - 0.5);
+
+  const grid = document.getElementById('cac-grid');
+  grid.innerHTML = '';
+  gridNums.forEach(n => {
+    const cell = document.createElement('div');
+    cell.className = 'num-cell';
+    cell.textContent = n;
+    cell.dataset.num = n;
+    cell.onclick = () => toggleCacciaCell(cell, n);
+    grid.appendChild(cell);
+  });
+
+  startCacciaTimer();
+}
+
+function startCacciaTimer() {
+  clearInterval(cacciaTimer);
+  cacciaTimeLeft = 30;
+  updateTimerUI(cacciaTimeLeft, 30, 'cac-timer-fill', 'cac-timer-num');
+  cacciaTimer = setInterval(() => {
+    cacciaTimeLeft--;
+    updateTimerUI(cacciaTimeLeft, 30, 'cac-timer-fill', 'cac-timer-num');
+    if (cacciaTimeLeft <= 0) { clearInterval(cacciaTimer); submitCaccia(); }
+  }, 1000);
+}
+
+function stopCaccia() {
+  clearInterval(cacciaTimer);
+}
+
+function toggleCacciaCell(cell, n) {
+  if (cacciaAnswered) return;
+  const idx = cacciaSelected.indexOf(n);
+  if (idx >= 0) {
+    cacciaSelected.splice(idx, 1);
+    cell.classList.remove('selected-good','selected-bad');
+  } else {
+    cacciaSelected.push(n);
+    const isDiv = cacciaCorrectDivisors.includes(n);
+    cell.classList.add(isDiv ? 'selected-good' : 'selected-bad');
+  }
+}
+
+function submitCaccia() {
+  clearInterval(cacciaTimer);
+  if (cacciaAnswered) return;
+  cacciaAnswered = true;
+
+  // Mark all cells
+  document.querySelectorAll('#cac-grid .num-cell').forEach(cell => {
+    const n = parseInt(cell.dataset.num);
+    const isDivisor = cacciaCorrectDivisors.includes(n);
+    if (isDivisor) {
+      cell.classList.add('selected-good');
+    }
+    cell.classList.add('disabled');
+  });
+
+  const userCorrect = cacciaSelected.filter(n => cacciaCorrectDivisors.includes(n)).length;
+  const userWrong = cacciaSelected.filter(n => !cacciaCorrectDivisors.includes(n)).length;
+  const missed = cacciaCorrectDivisors.length - userCorrect;
+  const pts = Math.max(0, userCorrect * 30 - userWrong * 15 - missed * 10) * getComboMultiplier() + cacciaTimeLeft * 3;
+
+  sessionCorrect += (missed === 0 && userWrong === 0) ? 1 : 0;
+  sessionScore += pts;
+  document.getElementById('cac-score').textContent = sessionScore;
+  updateCombo(missed === 0 && userWrong === 0);
+
+  const hb = document.getElementById('cac-hint');
+  hb.innerHTML = `<strong>I divisori di ${cacciaTargetNum}:</strong> ${cacciaCorrectDivisors.join(', ')}<br>
+  ✅ Corretti trovati: ${userCorrect}/${cacciaCorrectDivisors.length} &nbsp; ❌ Errori: ${userWrong} &nbsp; +${pts} pt`;
+  hb.style.display = 'block';
+
+  document.getElementById('cac-next').style.display = 'inline-block';
+  cacciaIndex++;
+  showFeedback(missed === 0 && userWrong === 0);
+}
+
+function nextCaccia() {
+  loadCacciaRound();
+}
+
+// Keyboard shortcut for geo answer
+document.getElementById('geo-ans-a').addEventListener('keydown', e => { if (e.key === 'Enter') checkGeo(); });
+document.getElementById('geo-ans-b').addEventListener('keydown', e => { if (e.key === 'Enter') checkGeo(); });
+</script>
+</body>
+</html>
